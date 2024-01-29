@@ -1,0 +1,39 @@
+{
+    "newsSources": [
+		{
+			"name": "CNN",
+			"url": "https://www.cnn.com",
+			"requiredClasses": "container__link",
+			"eitherOrClasses": [
+				"container__link--type-card",
+				"container__link--type-article"
+			],
+            "urlPatternToAvoid": "cnn-underscored|/audio/|/interactive/|cnn.it/"
+		},
+		{
+			"name": "Politico",
+			"url": "https://www.politico.com",
+			"requiredClasses": "js-tealium-tracking",
+			"eitherOrClasses": [],
+			"urlPatternToAvoid": "/gallery/|/interactives/|/video/|/tag/|/settings|/newsletters|/politics"
+		},
+        {
+            "name": "BBC",
+            "url": "https://www.bbc.com/news"
+        },
+		{
+			"name": "Al Jazeera",
+			"url": "https://www.aljazeera.com",
+			"requiredClasses": "u-clickable-card__link",
+			"eitherOrClasses": [],
+			"urlPatternToAvoid": "/inside-story/|/newsfeed/|/liveblog/"
+		},
+		{
+			"name": "The Guardian",
+			"url": "https://www.theguardian.com",
+			"requiredClasses": "dcr-lv2v9o",
+			"eitherOrClasses": [],
+			"urlPatternToAvoid": "/live/|/news/audio/"
+		}
+    ]
+}
