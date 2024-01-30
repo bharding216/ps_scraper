@@ -16,6 +16,8 @@ function SearchHtmlFiles {
         return
     }
 
+    Write-Host "Searching for keywords in HTML files..."
+
     # Get all HTML files in the specified directory
     $htmlFiles = Get-ChildItem -Path $directory -Filter *.html
 
@@ -24,6 +26,8 @@ function SearchHtmlFiles {
 
     # Loop through each HTML file
     foreach ($htmlFile in $htmlFiles) {
+        Write-Host "Checking file: $($htmlFile.FullName)"
+
         # Load HTML content using HTML Agility Pack
         $htmlDocument = New-Object HtmlAgilityPack.HtmlDocument
         $htmlDocument.Load($htmlFile.FullName)
@@ -36,8 +40,11 @@ function SearchHtmlFiles {
         # If at least one keyword is found, add the file to the list
         if ($containsKeyword) {
             $matchingFiles += $htmlFile.FullName
+            Write-Host "Match found in $($htmlFile.FullName)"
         }
     }
+
+    Write-Host "Search complete."
 
     # Return the list of matching HTML files
     return $matchingFiles
