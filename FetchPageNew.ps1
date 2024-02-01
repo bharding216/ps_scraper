@@ -1,87 +1,125 @@
-# To run the script, enter the following command in the terminal:
-# .\FetchPageNew.ps1
-
+# Add HtmlAgilityPack.dll to the PowerShell session
 Add-Type -Path 'C:\Users\brand\HtmlAgilityPack.1.11.57\lib\netstandard2.0\HtmlAgilityPack.dll'
 
-# Function to crawl a given URL and save articles
-function Crawl-And-Save-Articles {
+function Save-WebPage {
     param (
         [string]$url,
-        [int]$maxArticles,
-        [System.Collections.Generic.HashSet[string]]$visitedLinks
+        [string]$localFilePath
     )
 
-    # Check if the maximum number of articles has been reached
-    if ($visitedLinks.Count -ge $maxArticles) {
-        Write-Output "You reached the max number of articles"
-        return
-    }
+    Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Accept' = 'text/html' } -OutFile $localFilePath
+}
 
-    # Fetch HTML content from the current URL
-    $userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+function Get-CleanHrefList {
+    param (
+        [System.Collections.Generic.List[string]]$links,
+        [string]$url
+    )
 
-    $html = Invoke-WebRequest -Uri $url -TimeoutSec 10 -Headers @{ "User-Agent" = $userAgent } -ErrorAction Stop
+    $cleanHrefList = @()
 
-    # Check if the current page is an article
-    if (Is-Article -html $html) {
-        # if True, save the raw HTML content to a local file
-        $filename = "article_$((Get-Date).ToString('yyyyMMdd_HHmmss')).html"
-        $html.Content | Out-File -FilePath "C:\Users\brand\Documents\$filename" -Encoding UTF8
-        Write-Output "Article saved: $filename"
-    }
-
-    # Extract all links from the current page
-    $links = Get-Links -html $html
-    Write-Output "Found $($links.Count) links on $url"
-    Write-Output "Found these links: $($links -join ', ')"
-
-    # Visit each link if not already visited
     foreach ($link in $links) {
-        if (-not $visitedLinks.Contains($link)) {
-            $visitedLinks.Add($link) # Add link to 'visited' links list
-            Crawl-And-Save-Articles -url $link -maxArticles $maxArticles -visitedLinks $visitedLinks
+        $href = $link.GetAttributeValue('href', '')
+
+        if ($href -match '^/') {
+            $href = $url + $href
+        }
+
+        if ($href -notmatch "^$([regex]::Escape($url))") {
+            continue
+        }
+
+        $cleanHrefList += $href
+    }
+
+    $cleanHrefList | Sort-Object -Unique
+}
+
+function Save-Article {
+    param (
+        [string]$href,
+        [int]$maxArticles,
+        [ref]$articleCounter
+    )
+
+    if ($articleCounter.Value -ge $maxArticles) {
+        Write-Output "Maximum number of articles reached."
+        return $true
+    }
+
+    $hrefSafe = [System.Web.HttpUtility]::UrlEncode($href)
+    $localFilePath = "C:\Users\brand\Documents\$hrefSafe.html"
+
+    try {
+        $response = Invoke-WebRequest -Uri $href -Method Get -Headers @{ 'Accept' = 'text/html' }
+        
+        # Check if the response contains the <article> tag using HtmlAgilityPack
+        $htmlDoc = New-Object HtmlAgilityPack.HtmlDocument
+        $htmlDoc.LoadHtml($response.Content)
+        $articleNodes = $htmlDoc.DocumentNode.SelectNodes("//article")
+        
+        if ($articleNodes -ne $null) {
+            Save-ArticleContent $articleNodes $href $localFilePath
+            $articleCounter.Value++
+            Write-Output "$($articleCounter.Value) articles saved"
+        } else {
+            Write-Output "Skipping $href - Does not contain <article> tag"
+        }
+    } catch {
+        Write-Output "Failed to fetch ${href}"
+    }
+
+    return $false
+}
+
+function Save-ArticleContent {
+    param (
+        [System.Collections.Generic.List[string]]$articleNodes,
+        [string]$href,
+        [string]$localFilePath
+    )
+
+    foreach ($articleNode in $articleNodes) {
+        $articleContent = $articleNode.InnerText
+
+        if ($articleContent.Length -lt 1000) {
+            Write-Output "Skipping $href - Article content is too short"
+        } else {
+            $articleNode.InnerText | Out-File -FilePath $localFilePath -Force
+            Write-Output "Successfully fetched and saved $href"
         }
     }
 }
 
-# Function to check if a given HTML content represents an article
-function Is-Article {
+function Crawl-And-Save-Articles {
     param (
-        [string]$html
+        [string]$url,
+        [System.Collections.Generic.HashSet[string]]$visitedLinks,
+        [int]$maxArticles = 10
     )
 
-    # Check if the HTML contains the <article> element
-    $isArticle = $html -match '<article\b[^>]*>.*?</article>'
-    
-    if ($isArticle) {
-        return "This page is an article."
-    } else {
-        return "This page is not an article."
+    $filename = "article_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
+    $localFilePath = "C:\Users\brand\Documents\$filename.html"
+
+    Save-WebPage -url $url -localFilePath $localFilePath
+
+    $htmlDoc = New-Object HtmlAgilityPack.HtmlDocument
+    $htmlDoc.Load($localFilePath)
+
+    $links = $htmlDoc.DocumentNode.SelectNodes("//a[@href]")
+
+    $cleanHrefList = Get-CleanHrefList -links $links -url $url
+
+    Write-Output "Found $($cleanHrefList.Count) links on $url"
+
+    $articleCounter = 0
+
+    foreach ($href in $cleanHrefList) {
+        if (Save-Article -href $href -maxArticles $maxArticles -articleCounter ([ref]$articleCounter)) {
+            break
+        }
     }
 }
 
-# Function to extract all links from HTML content
-function Get-Links {
-    param (
-        [string]$html
-    )
-
-    # Load HTML content into HtmlDocument
-    $doc = New-Object HtmlAgilityPack.HtmlDocument
-    $doc.LoadHtml($html)
-
-    # Extract all links from the HTML document
-    $links = $doc.DocumentNode.SelectNodes('//a[@href]') | ForEach-Object { $_.Attributes['href'].Value }
-    
-    return $links
-}
-
-# Set the starting URL and maximum number of articles to collect
-$startUrl = "https://www.cnn.com"
-$maxArticles = 10
-
-# Create a HashSet to store visited links
-$visitedLinks = New-Object "System.Collections.Generic.HashSet[string]"
-
-# Start crawling
-Crawl-And-Save-Articles -url $startUrl -maxArticles $maxArticles -visitedLinks $visitedLinks
+# Example usage
+Crawl-And-Save-Articles -url "https://www.cnn.com"
