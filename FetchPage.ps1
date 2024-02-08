@@ -51,6 +51,8 @@ while ($true) {
         Write-Output "Completed process for $url!"
     }
 
+    Write-Output "I'm going to sleep for 10 seconds..."
+
     # Add a delay to control the frequency of execution
     Start-Sleep -Seconds 10  # 300 seconds = 5 minutes
 
