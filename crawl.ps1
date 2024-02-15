@@ -36,51 +36,62 @@ function checkMetaType ($htmlContent) {
     }
 }
 
-# function wordCount($doc) {
-#     $textContent = @()
-#     $tagsToCollect = @('p', 'pre', 'td')
-#     $wordCount = 0
+function wordCount($doc) {
+    $htmlDocument = New-Object HtmlAgilityPack.HtmlDocument
+    $htmlDocument.LoadHtml($doc)
 
-#     foreach ($tag in $tagsToCollect) {
-#         $nodes = $doc.DocumentNode.SelectNodes("//$tag")
+    $textContent = @()
+    $tagsToCollect = @('p', 'pre', 'td')
+    $wordCount = 0
 
-#         if ($nodes) {
-#             foreach ($node in $nodes) {
-#                 $textContent += $node.InnerHtml
-#             }
+    foreach ($tag in $tagsToCollect) {
+        $nodes = $htmlDocument.DocumentNode.SelectNodes("//$tag")
 
-#             $text = $textContent -join ' '
-#             $wordCount = $text.Split(' ').Count
-#         }
-#     }
+        if ($nodes) {
+            foreach ($node in $nodes) {
+                $textContent += $node.InnerHtml
+            }
 
-#     return $wordCount
-# }
+            $text = $textContent -join ' '
+            $wordCount = $text.Split(' ').Count
+        }
+    }
+
+    Write-Host "Word count: $wordCount"
+    return $wordCount
+}
+
+function mediaNewsCheck($link) {
+    $patternsToWatch = @('_video', '_slide', '_gallery', '_powerpoint', '_fashion', '_glamour', '_cloth')
+
+    foreach ($string in $patternsToWatch) {
+        if ($link -match $string) {
+            return $true
+        }
+    }
+
+    return $false
+}
 
 
 function CheckIfArticle($link) {
     $html = Invoke-WebRequest -Uri $link -Method Get -Headers @{ 'Accept' = 'text/html' }
 
-    if ((checkMetaType $html.Content) -eq $true) {
-        return $true
-    } else {
+    $wordCount = wordCount -doc $html.Content
+
+    if ((checkMetaType $html.Content) -eq $false) {
+        Write-Host "Not an article because: og:type is not article"
         return $false
+    } elseif ($wordCount -lt 300) {
+        Write-Host "Not an article because: low word count"
+        return $false
+    } elseif ((mediaNewsCheck $link) -eq $true) {
+        Write-Host "Not an article because: media url pattern"
+        return $false
+    } else {
+        return $true
     }
 
-    # $wordCount = wordCount -doc $html
-
-    # if ($wordCount -gt 500) {
-    #     Write-Output "This page has MORE than 500 words, evidence of an article."
-
-    # } else {
-    #     Write-Output "This page has LESS than 500 words."
-    # }
-
-    # if ((mediaNewsCheck -fileName $fileName) -eq $true) {
-    #     Write-Output "This page is a media/news page, most likely not an article."
-    # } else {
-    #     Write-Output "This page is NOT a media/news page."
-    # }
 
     # if ((getTitle -doc $htmlDoc) -ne '') {
     #     Write-Output "Title: $(getTitle -doc $html)"
@@ -101,7 +112,7 @@ function extractLinks($html_content, $url, $allLinks) {
     # that way, you won't need to fetch the same page multiple times.
     $uniqueHrefs = New-Object System.Collections.Generic.HashSet[string]
 
-    Write-Host "Going through the links and finding unique hrefs"
+    Write-Host "Going through the links and finding unique hrefs in $url"
 
     foreach ($link in $links) {
         $href = $link.GetAttributeValue("href", "")
@@ -182,11 +193,23 @@ function extractLinks($html_content, $url, $allLinks) {
         # If the links passes all your checks, append the normalized href to the array
         Write-Host "Adding this link to the hrefs array: $normalizedHref"
         [void]$hrefs.Add($normalizedHref)
+
+        # Break the loop if the count of hrefs is 10
+        if ($hrefs.Count -eq 10) {
+            Write-Host "Reached the limit of 5 hrefs"
+            break
+        }
     }
 
     Write-Host "Extracted link count: $($hrefs.Count) links from $url"
 
     $hrefs = $hrefs | Select-Object -Unique
+
+    $hrefs | ForEach-Object {
+        New-Object PSObject -Property @{
+            'Href' = $_
+        }
+    } | Export-Csv -Path 'hrefs.csv' -NoTypeInformation -Append
 
     Write-Host "Extracted UNIQUE link count: $($hrefs.Count) links from $url"
     return , $hrefs # Return the HashSet as an array
