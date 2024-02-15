@@ -102,7 +102,7 @@ function CheckIfArticle($link) {
 
 
 # Takes in the HTML content and the URL of the page and returns an array of unique links
-function extractLinks($html_content, $url, $allLinks) {
+function extractLinks($html_content, $url, $allLinks, $existingCsvLinks) {
     $doc = New-Object HtmlAgilityPack.HtmlDocument
     $doc.LoadHtml($html_content)
 
@@ -178,6 +178,11 @@ function extractLinks($html_content, $url, $allLinks) {
             continue
         }
 
+        if ($existingCsvLinks.Contains($normalizedHref)) {
+            Write-Host "Skipping link $normalizedHref (already in the CSV file)"
+            continue
+        }
+
 
         # make a call to the CheckIfArticle function
         $isArticle = CheckIfArticle $normalizedHref
@@ -224,78 +229,6 @@ function normalizeUrl($url) {
     return $url
 }
 
-# function crawl($coreUrls) {
-#     $urlsVisited = New-Object Collections.Generic.HashSet[string]
-
-#     # Will be sites like cnn.com, bbc.com, etc.
-#     foreach ($coreUrl in $coreUrls) {
-#         Write-Host "Starting crawl process for core URL: $coreUrl"
-#         $normalizedCoreUrl = normalizeUrl $coreUrl
-#         [void]$urlsVisited.Add($normalizedCoreUrl)
-
-#         # Fetch the HTML content of the core URL
-#         $html = fetchPage $normalizedCoreUrl
-
-#         # Extract links from the core URL's HTML content
-#         # FYI: Level 1 links are links on the home page of the news site
-#         $level_1_links = extractLinks $html $normalizedCoreUrl
-#         Write-Host "Extracted level 1 links:" $level_1_links
-
-#         Write-Host "Starting to crawl through level 1 links..."
-#         foreach ($link in $level_1_links) {
-#             Write-Host "About to normalize this link: $link"
-#             $normalizedLink = normalizeUrl $link
-#             Write-Host "Normalized link: $normalizedLink"
-
-#             Write-Host "Checking if $normalizedLink has been visited."
-#             if (-not $urlsVisited.Contains($normalizedLink)) {
-#                 Write-Host "List of urlsVisited: $($urlsVisited.Keys -join ', ')"
-#                 Write-Host "This link is not in the urlsVisited list: $normalizedLink"
-
-#                 # Export level 1 links to CSV
-#                 $csvPath = "links.csv"
-#                 $level_1_links | ForEach-Object {
-#                     [PSCustomObject]@{
-#                         Link = $_
-#                     }
-#                 } | Export-Csv -Path $csvPath -NoTypeInformation -Append
-
-#                 Write-Host "Level 1 links exported to $csvPath"
-
-#                 [void]$urlsVisited.Add($normalizedLink)
-
-#                 $level_2_links = extractLinks (fetchPage $normalizedLink) $normalizedLink
-
-#                 foreach ($link2 in $level_2_links) {
-#                     $normalizedLink2 = normalizeUrl $link2
-#                     if (-not $urlsVisited.Contains($normalizedLink2)) {
-#                         Write-Host "urlsVisited: $($urlsVisited.Keys -join ', ')"
-#                         Write-Host "Found new link: $normalizedLink2"
-
-#                         # Append level 2 links to the CSV file
-#                         $level_2_links | ForEach-Object {
-#                             [PSCustomObject]@{
-#                                 Link = $_
-#                             }
-#                         } | Export-Csv -Path $csvPath -NoTypeInformation -Append
-
-#                         Write-Host "Level 2 links appended to $csvPath"
-
-#                         [void]$urlsVisited.Add($normalizedLink2)
-#                     } else {
-#                         Write-Host "Already visited $normalizedLink2"
-#                     }
-#                 }
-
-#             } else {
-#                 Write-Host "Already visited $normalizedLink"
-#             }
-#         }
-
-#         Write-Host "Finished crawling $coreUrl"
-#     }
-# }
-
 
 $newsSources = Get-Content -Path "./sources.json" | ConvertFrom-Json
 $coreUrls = $newsSources.sources
@@ -310,6 +243,8 @@ $allLinks = $allLinks | ForEach-Object {
     normalizeUrl $_
 }
 
+$existingCsvLinks = (Import-Csv -Path "hrefs.csv").Hrefs # name of the column in the CSV file
+
 for ($depth = 1; $depth -le $maxDepth; $depth++) {
     Write-Host "Crawling depth $depth"
 
@@ -320,7 +255,7 @@ for ($depth = 1; $depth -le $maxDepth; $depth++) {
         $htmlContent = fetchPage -url $currentLink
 
         # Extract the links from the current page
-        $links = extractLinks -html_content $htmlContent -url $currentLink -allLinks $allLinks
+        $links = extractLinks -html_content $htmlContent -url $currentLink -allLinks $allLinks -existingCsvLinks $existingCsvLinks
 
         # Add the extracted links to the list of all links
         $allLinks += $links
