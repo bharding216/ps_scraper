@@ -102,7 +102,7 @@ function CheckIfArticle($link) {
 
 
 # Takes in the HTML content and the URL of the page and returns an array of unique links
-function extractLinks($html_content, $url, $allLinks, $existingCsvLinks) {
+function extractLinks($html_content, $url, $uncrawledLinks, $existingArticleLinks, $linksAlreadyCrawled, $keywords) {
     $doc = New-Object HtmlAgilityPack.HtmlDocument
     $doc.LoadHtml($html_content)
 
@@ -178,8 +178,8 @@ function extractLinks($html_content, $url, $allLinks, $existingCsvLinks) {
             continue
         }
 
-        if ($existingCsvLinks.Contains($normalizedHref)) {
-            Write-Host "Skipping link $normalizedHref (already in the CSV file)"
+        if ($existingArticleLinks.Contains($normalizedHref)) {
+            Write-Host "Skipping link $normalizedHref (already saved in the csv (articles) file)"
             continue
         }
 
@@ -233,31 +233,39 @@ function normalizeUrl($url) {
 $newsSources = Get-Content -Path "./sources.json" | ConvertFrom-Json
 $coreUrls = $newsSources.sources
 
+$keywords = (Get-Content -Path "./keywords.json" | ConvertFrom-Json).keywords
+
 $maxDepth = 3
 
-$allLinks = @($coreUrls)
-Write-Host "Current value of all links: $allLinks"
+Write-Host "Current value of core URLs: $coreUrls"
 
-# Convert each link in $allLInks to a normalized URL
-$allLinks = $allLinks | ForEach-Object {
+$linksAlreadyCrawled = @()
+
+$uncrawledLinks = $coreUrls | ForEach-Object {
     normalizeUrl $_
 }
 
-$existingCsvLinks = (Import-Csv -Path "hrefs.csv").Hrefs # name of the column in the CSV file
+# In the future, this will be loaded from the csv file
+$existingArticleLinks = (Import-Csv -Path "hrefs.csv").Hrefs # name of the column in the CSV file
 
 for ($depth = 1; $depth -le $maxDepth; $depth++) {
     Write-Host "Crawling depth $depth"
 
     # Loop through the links at the current depth level
-    foreach ($currentLink in $allLinks) {
+    foreach ($currentLink in $uncrawledLinks) {
         Write-Host "Crawling $currentLink"
 
         $htmlContent = fetchPage -url $currentLink
 
         # Extract the links from the current page
-        $links = extractLinks -html_content $htmlContent -url $currentLink -allLinks $allLinks -existingCsvLinks $existingCsvLinks
+        $links = extractLinks -html_content $htmlContent `
+                              -url $currentLink `
+                              -uncrawledLinks $uncrawledLinks `
+                              -existingArticleLinks $existingArticleLinks `
+                              -linksAlreadyCrawled $linksAlreadyCrawled `
+                              -keywords $keywords
 
         # Add the extracted links to the list of all links
-        $allLinks += $links
+        $uncrawledLinks += $links
     }
 }
