@@ -62,7 +62,7 @@ function wordCount($doc) {
 }
 
 function mediaNewsCheck($link) {
-    $patternsToWatch = @('/video/?', '/slide/?', '/gallery/?', '/powerpoint/?', '/fashion/?', '/glamour/?', '/cloth/?', '/live/?', '/podcast/?', '/reel/?', '/audio/?', '/profile/?')
+    $patternsToWatch = @('/video/?', '/slide/?', '/gallery/?', '/powerpoint/?', '/fashion/?', '/glamour/?', '/cloth/?', '/live/?', '/podcast/?', '/reel/?', '/audio/?', '/profile/?', '/photo/?', '/terms/?', '/privacy/?', '/cookie/?', '/about/?', '/contact/?', '/advert/?', '/subscribe/?', '/subscription/?', '/shop/?', '/store/?', '/buy/?', '/purchase/?', '/donate/?', '/support/?', '/help/?', '/faq/?', '/feedback/?', '/survey/?', '/poll/?', '/quiz/?', '/competition/?', '/contest/?', '/sweepstake/?', '/sweepstakes/?', '/lottery/?', '/bet/?', '/gamble/?', '/casino/?', '/poker/?', '/bingo/?', '/slot/?', '/roulette/?', '/blackjack/?', '/craps/?', '/baccarat/?', '/keno/?', '/scratch/?', '/scratchcard/?', '/scratchcard/?', '/lotto/?')
     
     foreach ($string in $patternsToWatch) {
         if ($link -match $string) {
