@@ -1,1 +1,4 @@
 hrefs.csv
+linksToCrawl.csv
+linksAlreadyCheckedIfArticle.csv
+articles.csv
