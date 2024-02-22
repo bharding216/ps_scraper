@@ -66,6 +66,7 @@ function mediaNewsCheck($link) {
     
     foreach ($string in $patternsToWatch) {
         if ($link -match $string) {
+            Write-Host "Media URL pattern found: $string"
             return $true
         }
     }
