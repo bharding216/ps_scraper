@@ -6,7 +6,7 @@ function fetchPage {
     )
 
     try {
-        Write-Host "Fetching HTML from $url"
+        # Write-Host "Fetching HTML from $url"
         $html = Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Accept' = 'text/html' } -ErrorAction Stop
         return $html.Content
     } catch {
@@ -57,13 +57,13 @@ function wordCount($doc) {
         }
     }
 
-    Write-Host "Word count: $wordCount"
+    # Write-Host "Word count: $wordCount"
     return $wordCount
 }
 
 function mediaNewsCheck($link) {
-    $patternsToWatch = @('_video', '_slide', '_gallery', '_powerpoint', '_fashion', '_glamour', '_cloth')
-
+    $patternsToWatch = @('/video/?', '/slide/?', '/gallery/?', '/powerpoint/?', '/fashion/?', '/glamour/?', '/cloth/?', '/live/?', '/podcast/?', '/reel/?', '/audio/?', '/profile/?')
+    
     foreach ($string in $patternsToWatch) {
         if ($link -match $string) {
             return $true
@@ -74,18 +74,18 @@ function mediaNewsCheck($link) {
 }
 
 
-function CheckIfArticle($html) {
+function CheckIfArticle($html, $newLink) {
 
     $wordCount = wordCount -doc $html.Content
 
     if ((checkMetaType $html.Content) -eq $false) {
-        Write-Host "Not an article because: og:type is not article"
+        # Write-Host "Not an article because: og:type is not article"
         return $false
     } elseif ($wordCount -lt 300) {
-        Write-Host "Not an article because: low word count"
+        # Write-Host "Not an article because: low word count"
         return $false
-    } elseif ((mediaNewsCheck $link) -eq $true) {
-        Write-Host "Not an article because: media url pattern"
+    } elseif ((mediaNewsCheck $newLink) -eq $true) {
+        # Write-Host "Not an article because: media url pattern"
         return $false
     } else {
         return $true
@@ -97,28 +97,28 @@ function CheckIfPageContainsKeywords($html, $keywords) {
     $htmlDocument = New-Object HtmlAgilityPack.HtmlDocument
     $htmlDocument.LoadHtml($html.Content)
 
-    $textContent = @()
-    $tagsToCollect = @('p', 'pre', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'title', 'meta', 'span', 'div')
+    $textContent = New-Object System.Text.StringBuilder
+    $tagsToCollect = @('p', 'pre', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'title')
 
     foreach ($tag in $tagsToCollect) {
         $nodes = $htmlDocument.DocumentNode.SelectNodes("//$tag")
 
         if ($nodes) {
             foreach ($node in $nodes) {
-                $textContent += $node.InnerHtml
+                $null = $textContent.Append($node.InnerText.ToLower())
             }
+
         }
     }
 
-    Write-Host "Text content in CheckIfPageContainsKeywords: $textContent"
-    $text = $textContent -join ' '
+    # Write-Host "Text in html for keyword match: $($textContent.ToString())"
 
     foreach ($keyword in $keywords) {
-        if ($text -match $keyword) {
+        if ($textContent.ToString().Contains($keyword)) {
+            # Write-Host "Found keyword: $keyword"
             return $true
         }
     }
-
     return $false
 }
 
@@ -154,9 +154,9 @@ function extractLinks($html_content, $url, $linksToCrawl, $existingArticleLinks,
         # Check if the href is not empty and not already in the HashSet
         if (-not [string]::IsNullOrEmpty($href) -and -not $uniqueHrefs.Contains($href) -and -not $linksAlreadyCheckedIfArticle.Contains($href)) {
             [void]$uniqueHrefs.Add($href)
-            Write-Host "Added href: $href to the uniqueHrefs HashSet"
+            # Write-Host "Added href: $href to the uniqueHrefs HashSet"
         } else {
-            Write-Host "Skipping href: $href, already in the uniqueHrefs HashSet or linksAlreadyCheckedIfArticle array"
+            # Write-Host "Skipping href: $href, already in the uniqueHrefs HashSet or linksAlreadyCheckedIfArticle array"
         }
     }
 
@@ -167,7 +167,7 @@ function extractLinks($html_content, $url, $linksToCrawl, $existingArticleLinks,
         }
         
         if ($href -notlike "http*") { 
-            Write-Host "Converting relative URL to absolute URL"
+            # Write-Host "Converting relative URL to absolute URL"
             $urlBase = [System.Uri]::new($url)
             $href = New-Object System.Uri($urlBase, $href)
         }
@@ -176,39 +176,39 @@ function extractLinks($html_content, $url, $linksToCrawl, $existingArticleLinks,
         $normalizedHref = normalizeUrl $href
 
 
-        Write-Host "Evaluating this link: $normalizedHref in $url"
+        # Write-Host "Evaluating this link: $normalizedHref in $url"
         # Check if the extracted link has the same domain as the base URL
         try {
             $linkUri = [System.Uri]::new($normalizedHref)
             $baseUri = [System.Uri]::new($url)
         }
         catch [System.UriFormatException] {
-            Write-Host "Invalid URI: $normalizedHref"
+            # Write-Host "Invalid URI: $normalizedHref"
             continue
         }
         
         if ($baseUri.Host -ne $linkUri.Host) {
-            Write-Host "Skipping link $normalizedHref (different domain)"
+            # Write-Host "Skipping link $normalizedHref (different domain)"
             continue
         }
 
         # Check if the normalized href has already been added
         if ($linksToCrawl.Contains($normalizedHref)) {
-            Write-Host "Skipping link $normalizedHref (already added to linksToCrawl array)"
+            # Write-Host "Skipping link $normalizedHref (already added to linksToCrawl array)"
             continue
         }
         
 
         if ($existingArticleLinks.Contains($normalizedHref)) {
-            Write-Host "Skipping link $normalizedHref (already saved in the csv (articles) file)"
+            # Write-Host "Skipping link $normalizedHref (already saved in the csv (articles) file)"
             continue
         }
 
-        Write-Host "Adding link $normalizedHref to linksToCrawl array"
+        # Write-Host "Adding link $normalizedHref to linksToCrawl array"
         $newLinks += $normalizedHref
     }
 
-    Write-Host "Returning newLinks array"
+    # Write-Host "Returning newLinks array"
     return , $newLinks
 }
 
@@ -222,7 +222,7 @@ function extractLinks($html_content, $url, $linksToCrawl, $existingArticleLinks,
 $newsSources = Get-Content -Path "./sources.json" | ConvertFrom-Json
 $coreUrls = $newsSources.sources
 
-Write-Host "Current value of core URLs: $coreUrls"
+# Write-Host "Current value of core URLs: $coreUrls"
 
 $keywords = (Get-Content -Path "./keywords.json" | ConvertFrom-Json).keywords
 
@@ -231,6 +231,7 @@ $numberOfArticlesToCollectUntilNewDomain = 5
 $linksAlreadyCheckedIfArticle = (Import-Csv -Path "linksAlreadyCheckedIfArticle.csv").checked_if_article # name of the column in the CSV file
 $linksAlreadyCrawled = @()
 
+# Long-term, this will be loaded from a csv or database.
 $linksToCrawl = $coreUrls | ForEach-Object {
     normalizeUrl $_
 }
@@ -242,11 +243,12 @@ $currentDomain = 'politico.com'
 
 while ($linksToCrawl.Count -gt 0) {
     $linksToCrawl = $linksToCrawl | Get-Random -Count $linksToCrawl.Count
-    Write-Host "Current value of linksToCrawl array: $linksToCrawl"
+    Write-Host "linksToCrawl contains this many links: $($linksToCrawl.Count)"
+    # Write-Host "Current value of linksToCrawl array: $linksToCrawl"
     $link = $linksToCrawl | Where-Object { $_ -notlike "*$currentDomain*" } | Select-Object -First 1
 
-    Write-Host "Fetching page from link: $link in the linksToCrawl array"
-    Write-Host "This should be a different domain than $currentDomain."
+    # Write-Host "Fetching page from link: $link in the linksToCrawl array"
+    # Write-Host "This should be a different domain than $currentDomain."
     $html = fetchPage -url $link
 
     if (-not $html) {
@@ -273,11 +275,11 @@ while ($linksToCrawl.Count -gt 0) {
     foreach ($newLink in $newLinks) {
         # if $newLink is not in $linksAlreadyCheckedIfArticle
         if ($linksAlreadyCheckedIfArticle.Contains($newLink)) {
-            Write-Host "Skipping $newLink because it's already in linksAlreadyCheckedIfArticle array"
+            # Write-Host "Skipping $newLink because it's already in linksAlreadyCheckedIfArticle array"
             continue
         }
 
-        Write-Host "Adding $newLink to linksAlreadyCheckedIfArticle array"
+        # Write-Host "Adding $newLink to linksAlreadyCheckedIfArticle array"
         $linksAlreadyCheckedIfArticle += $newLink
         
         ##########
@@ -288,42 +290,50 @@ while ($linksToCrawl.Count -gt 0) {
         } 
         catch {
             Write-Host "Tried to fetch ${newLink}, but it returned an error. Skipping this link."
-            return $false
+            continue
         }
 
-        Write-Host "Checking if $newLink is an article"
-        $isArticle = CheckIfArticle $html
-        Write-Host "Checking if $newLink contains keywords"
-        $containsKeywords = CheckIfPageContainsKeywords $html $keywords
+        # Write-Host "Checking if $newLink is an article"
+        $isArticle = CheckIfArticle $html, $newLink
+        # Write-Host "Checking if $newLink contains keywords"
+
+        if ($isArticle -eq $true) {
+            $containsKeywords = CheckIfPageContainsKeywords $html $keywords
+        } else {
+            $containsKeywords = $false
+        }  
+
 
         ##########
 
-        Write-Host "Adding $newLink to linksAlreadyCheckedIfArticle csv"
+        # Write-Host "Adding $newLink to linksAlreadyCheckedIfArticle csv"
         $linksAlreadyCheckedIfArticle += $newLink
         New-Object PSObject -Property @{
             'checked_if_article' = $newLink
         } | Export-Csv -Path 'linksAlreadyCheckedIfArticle.csv' -NoTypeInformation -Append
 
         if ($isArticle -eq $true -and $containsKeywords -eq $true) {
+            Write-Host "Found an article that contains keywords!"
             $existingArticleLinks += $newLink
             $articleCount++
             Write-Host "New article count: $articleCount"
 
-            Write-Host "Adding $newLink to articles.csv"
+            # Write-Host "Adding $newLink to articles.csv"
             New-Object PSObject -Property @{
                 'Articles' = $newLink
             } | Export-Csv -Path 'articles.csv' -NoTypeInformation -Append
         }
 
+        $currentDomain = [System.Uri]::new($newLink).Host
+        # Write-Host "Current domain: $currentDomain"
+
         if ($articleCount -eq $numberOfArticlesToCollectUntilNewDomain) {
             Write-Host "Article count reached the limit of $numberOfArticlesToCollectUntilNewDomain"            
-            $currentDomain = [System.Uri]::new($newLink).Host
-            Write-Host "Current domain: $currentDomain"
             break
         }
     }
 
-    Write-Host "Removing $link from linksToCrawl array"
+    # Write-Host "Removing $link from linksToCrawl array"
     $linksToCrawl = $linksToCrawl | Where-Object { $_ -ne $link }
 }
 
