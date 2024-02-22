@@ -74,14 +74,7 @@ function mediaNewsCheck($link) {
 }
 
 
-function CheckIfArticle($link) {
-    try {
-        $html = Invoke-WebRequest -Uri $link -Method Get -Headers @{ 'Accept' = 'text/html' } -ErrorAction Stop
-    } 
-    catch {
-        Write-Host "Tried to fetch ${link}, but it returned an error. Skipping this link."
-        return $false
-    }
+function CheckIfArticle($html) {
 
     $wordCount = wordCount -doc $html.Content
 
@@ -98,6 +91,38 @@ function CheckIfArticle($link) {
         return $true
     }
 }
+
+
+function CheckIfPageContainsKeywords($html, $keywords) {
+    $htmlDocument = New-Object HtmlAgilityPack.HtmlDocument
+    $htmlDocument.LoadHtml($html.Content)
+
+    $textContent = @()
+    $tagsToCollect = @('p', 'pre', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'title', 'meta', 'span', 'div')
+
+    foreach ($tag in $tagsToCollect) {
+        $nodes = $htmlDocument.DocumentNode.SelectNodes("//$tag")
+
+        if ($nodes) {
+            foreach ($node in $nodes) {
+                $textContent += $node.InnerHtml
+            }
+        }
+    }
+
+    Write-Host "Text content in CheckIfPageContainsKeywords: $textContent"
+    $text = $textContent -join ' '
+
+    foreach ($keyword in $keywords) {
+        if ($text -match $keyword) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+
 
 function normalizeUrl($url) {
     $url = $url -replace "https?://", "https://"  # Ensure the URL has a scheme (https)
@@ -236,7 +261,6 @@ while ($linksToCrawl.Count -gt 0) {
         -linksToCrawl $linksToCrawl `
         -existingArticleLinks $existingArticleLinks `
         -linksAlreadyCrawled $linksAlreadyCrawled `
-        -keywords $keywords `
         -linksAlreadyCheckedIfArticle $linksAlreadyCheckedIfArticle
 
 
@@ -256,8 +280,23 @@ while ($linksToCrawl.Count -gt 0) {
         Write-Host "Adding $newLink to linksAlreadyCheckedIfArticle array"
         $linksAlreadyCheckedIfArticle += $newLink
         
+        ##########
+        # Checking if article and if it contains keywords
+
+        try {
+            $html = Invoke-WebRequest -Uri $newLink -Method Get -Headers @{ 'Accept' = 'text/html' } -ErrorAction Stop
+        } 
+        catch {
+            Write-Host "Tried to fetch ${newLink}, but it returned an error. Skipping this link."
+            return $false
+        }
+
         Write-Host "Checking if $newLink is an article"
-        $isArticle = CheckIfArticle $newLink
+        $isArticle = CheckIfArticle $html
+        Write-Host "Checking if $newLink contains keywords"
+        $containsKeywords = CheckIfPageContainsKeywords $html $keywords
+
+        ##########
 
         Write-Host "Adding $newLink to linksAlreadyCheckedIfArticle csv"
         $linksAlreadyCheckedIfArticle += $newLink
@@ -265,7 +304,7 @@ while ($linksToCrawl.Count -gt 0) {
             'checked_if_article' = $newLink
         } | Export-Csv -Path 'linksAlreadyCheckedIfArticle.csv' -NoTypeInformation -Append
 
-        if ($isArticle) {
+        if ($isArticle -eq $true -and $containsKeywords -eq $true) {
             $existingArticleLinks += $newLink
             $articleCount++
             Write-Host "New article count: $articleCount"

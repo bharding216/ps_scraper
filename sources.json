@@ -1,6 +1,9 @@
 {
     "sources": [
 		"https://www.cnn.com",
-		"https://www.politico.com"
+		"https://www.politico.com",
+		"https://www.bbc.com",
+		"https://www.aljazeera.com",
+		"https://www.theguardian.com"
     ]
 }
