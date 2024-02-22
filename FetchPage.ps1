@@ -16,7 +16,7 @@ function Save-Page {
     Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Accept' = 'text/html' } -OutFile $fileStoragePath
 }
 
-function Fetch-Page {
+function Request-Page {
     param (
         [string]$url
     )
@@ -47,7 +47,7 @@ $articleUrls = $jsonContent.articleUrls
 while ($true) {
     foreach ($url in $articleUrls) {
         Write-Output "Beginning crawl process for $url..."
-        Fetch-Page -url $url
+        Request-Page -url $url
         Write-Output "Completed process for $url!"
     }
 

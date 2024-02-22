@@ -13,7 +13,7 @@ function Save-HomePage {
     Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Accept' = 'text/html' } -OutFile $localFilePath
 }
 
-function Crawl-And-Save-Articles {
+function Get-And-Save-Articles {
     param (
         [string]$url,
         [System.Collections.Generic.HashSet[string]]$visitedLinks,
@@ -78,7 +78,7 @@ function Crawl-And-Save-Articles {
             $sectionNodes = $htmlDoc.DocumentNode.SelectNodes("//section")
         
             # If the response contains the <article> tag, save the response to a local file
-            if ($articleNodes -ne $null) {
+            if ($null -ne $articleNodes) {
                 Write-Output "Found <article> tag within: $href"
 
                 foreach ($articleNode in $articleNodes) {
@@ -95,7 +95,7 @@ function Crawl-And-Save-Articles {
                     }
                 }
 
-            } elseif ($sectionNodes -ne $null) {
+            } elseif ($null -ne $sectionNodes) {
                 Write-Output "Found <section> tag within: $href"
 
                 foreach ($sectionNode in $sectionNodes) {
@@ -130,6 +130,6 @@ $visitedLinks = New-Object "System.Collections.Generic.HashSet[string]"
 # Start crawling
 foreach ($sourceUrl in $sources) {
     Write-Output "Searching for articles from $sourceUrl..."
-    Crawl-And-Save-Articles -url $sourceUrl -visitedLinks $visitedLinks -maxArticles 10
+    Get-And-Save-Articles -url $sourceUrl -visitedLinks $visitedLinks -maxArticles 10
     Write-Output "Completed fetching for $sourceUrl!"
 }
