@@ -2,15 +2,21 @@ Add-Type -Path 'C:\Users\brand\HtmlAgilityPack.1.11.57\lib\netstandard2.0\HtmlAg
 
 function fetchPage {
     param(
-        [string]$url
+        [string]$url,
+        [int]$delayInSeconds = 3
     )
 
     try {
         # Write-Host "Fetching HTML from $url"
         $html = Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Accept' = 'text/html' } -ErrorAction Stop
+        $startSleep = Get-Date
+        Write-Host "Time fell asleep: $startSleep"
+        Start-Sleep -Seconds $delayInSeconds
+        $endSleep = Get-Date
+        Write-Host "Time woke up: $endSleep"
         return $html.Content
     } catch {
-        Write-Host "Failed to fetch ${url}. This page threw an error."
+        Write-Host "Failed to fetch ${url}. This page threw an error: $($_.Exception.Message)"
         return $null
     }
 }
@@ -228,7 +234,7 @@ $coreUrls = $newsSources.sources
 $keywords = (Get-Content -Path "./keywords.json" | ConvertFrom-Json).keywords
 
 $articleCount = 0
-$numberOfArticlesToCollectUntilNewDomain = 5
+$numberOfArticlesToCollectUntilNewDomain = 15
 $linksAlreadyCheckedIfArticle = (Import-Csv -Path "linksAlreadyCheckedIfArticle.csv").checked_if_article # name of the column in the CSV file
 $linksAlreadyCrawled = @()
 
@@ -241,6 +247,9 @@ $linksToCrawl = $coreUrls | ForEach-Object {
 $existingArticleLinks = (Import-Csv -Path "articles.csv").Articles # name of the column in the CSV file
 
 $currentDomain = 'politico.com'
+
+$startTime = Get-Date
+"Start Time: $startTime" | Out-File -FilePath "timeElapsed.txt" -Append
 
 while ($linksToCrawl.Count -gt 0) {
     $linksToCrawl = $linksToCrawl | Get-Random -Count $linksToCrawl.Count
@@ -288,6 +297,7 @@ while ($linksToCrawl.Count -gt 0) {
 
         try {
             $html = Invoke-WebRequest -Uri $newLink -Method Get -Headers @{ 'Accept' = 'text/html' } -ErrorAction Stop
+            Start-Sleep -Seconds 3
         } 
         catch {
             Write-Host "Tried to fetch ${newLink}, but it returned an error. Skipping this link."
@@ -330,6 +340,11 @@ while ($linksToCrawl.Count -gt 0) {
 
         if ($articleCount -eq $numberOfArticlesToCollectUntilNewDomain) {
             Write-Host "Article count reached the limit of $numberOfArticlesToCollectUntilNewDomain"            
+            # $endTime = Get-Date
+            # "End Time: $endTime" | Out-File -FilePath "timeElapsed.txt" -Append
+            # $timeElapsed = $endTime - $startTime
+            # Write-Host "Total time elapsed: $timeElapsed"
+            # "Total time elapsed: $timeElapsed" | Out-File -FilePath "timeElapsed.txt" -Append
             break
         }
     }
