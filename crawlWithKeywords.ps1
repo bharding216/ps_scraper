@@ -1,5 +1,7 @@
 Add-Type -Path 'C:\Users\brand\HtmlAgilityPack.1.11.57\lib\netstandard2.0\HtmlAgilityPack.dll'
 
+. .\pullContent.ps1
+
 function fetchPage {
     param(
         [string]$url,
@@ -282,6 +284,7 @@ while ($linksToCrawl.Count -gt 0) {
 
     $articleCount = 0
 
+    Write-Host "Checking if links in newLinks are an article and if they contain keywords"
     foreach ($newLink in $newLinks) {
         # if $newLink is not in $linksAlreadyCheckedIfArticle
         if ($linksAlreadyCheckedIfArticle.Contains($newLink)) {
@@ -297,7 +300,7 @@ while ($linksToCrawl.Count -gt 0) {
 
         try {
             $html = Invoke-WebRequest -Uri $newLink -Method Get -Headers @{ 'Accept' = 'text/html' } -ErrorAction Stop
-            Start-Sleep -Seconds 3
+            Start-Sleep -Seconds 3 # 3-second politeness delay between requests
         } 
         catch {
             Write-Host "Tried to fetch ${newLink}, but it returned an error. Skipping this link."
@@ -328,6 +331,13 @@ while ($linksToCrawl.Count -gt 0) {
             $existingArticleLinks += $newLink
             $articleCount++
             Write-Host "New article count: $articleCount"
+
+            # Call the pullContent.ps1 script here, pass in the html, and parse the content.
+            # Return the title, content, author, URL, and date.
+            Write-Host "Calling pullContent.ps1 script"
+            $pulledContentResult = Find-Content -html $html.Content -url $newLink
+            Write-Host "Pulled content resulting content: $($pulledContentResult.content)"
+            Write-Host "Pulled content resulting URL: $($pulledContentResult.url)"
 
             # Write-Host "Adding $newLink to articles.csv"
             New-Object PSObject -Property @{
